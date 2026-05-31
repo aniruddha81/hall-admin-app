@@ -13,7 +13,7 @@ export function SectionHeader({ title, caption, actionLabel, onActionPress }: Se
   const { colors, spacing } = useTheme();
 
   return (
-    <View style={[styles.row, { marginTop: spacing.xs }]}>
+    <View style={[styles.row, { marginTop: spacing.lg, paddingTop: spacing.sm }]}>
       <View style={styles.titleWrap}>
         {/* Left vertical accent indicator */}
         <View style={[styles.accent, { backgroundColor: colors.primary }]} />

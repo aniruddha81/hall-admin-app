@@ -51,7 +51,8 @@ export function Screen({
       : Platform.OS === 'android'
         ? (StatusBar.currentHeight ?? 0)
         : 0;
-  const topPadding = header ? Spacing.md : topInset + Spacing.sm;
+  /** Below gradient header: overlap pulls content up; pad by overlap + inset so titles clear the curve. */
+  const topPadding = header ? overlap + Spacing.md : topInset + Spacing.sm;
 
   useFocusEffect(
     useCallback(() => {

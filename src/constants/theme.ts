@@ -1,65 +1,76 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+import { Platform, type ViewStyle } from 'react-native';
+import { colors } from '@/theme/colors';
+import { spacing, radius } from '@/theme/spacing';
+import { typography } from '@/theme/spacing';
+import { shadows } from '@/theme/shadows';
 
-import '@/global.css';
+export type ThemePreference = 'system' | 'light' | 'dark';
+export type ResolvedTheme = 'light' | 'dark';
 
-import { Platform } from 'react-native';
+// Legacy compatibility: re-export colors under the legacy structure
+export const Colors = colors;
+export type AppColors = typeof Colors[ResolvedTheme];
 
-export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-  },
-} as const;
+export const Fonts = typography.fonts;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
-});
-
+// Map our custom spacing naming back to legacy xs-xxl
 export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+  xs: spacing.sm,    // 8
+  sm: spacing.md,    // 12
+  md: spacing.lg,    // 16
+  lg: spacing.xxl,   // 24
+  xl: spacing.xxxl,  // 32
+  xxl: spacing.massive, // 48
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+export const Radius = {
+  sm: radius.sm,
+  md: radius.md,
+  lg: radius.xl, // Premium 16px radius
+  xl: radius.xxl, // 24px radius
+  full: radius.full,
+} as const;
+
+export function gradientStops(colors: AppColors): [string, string, string] {
+  return [colors.primary, colors.secondary, colors.tertiary];
+}
+
+export const GradientAxis = {
+  start: { x: 0, y: 0 },
+  end: { x: 1, y: 1 },
+} as const;
+
+/** Raised card / tile style conforming to the premium design specification */
+export function elevatedCardStyle(colors: AppColors, theme: ResolvedTheme): ViewStyle {
+  return {
+    backgroundColor: theme === 'dark' ? colors.surface : colors.backgroundSecondary,
+    borderColor: colors.border,
+    borderWidth: 1,
+    ...shadows[theme],
+  } as ViewStyle;
+}
+
+/** Filled button style matching premium primary styles */
+export function filledButtonStyle(
+  colors: AppColors,
+  theme: ResolvedTheme,
+  pressed: boolean,
+): ViewStyle {
+  const bg = theme === 'dark' ? colors.primary : colors.primary;
+  return {
+    backgroundColor: bg,
+    opacity: pressed ? 0.9 : 1,
+  };
+}
+
+/** Outlined or secondary control surfaces */
+export function outlinedControlStyle(colors: AppColors, theme: ResolvedTheme): ViewStyle {
+  return {
+    backgroundColor: colors.surfaceGlass,
+    borderColor: colors.border,
+    borderWidth: 1,
+  };
+}
+export { spacing, radius } from '@/theme/spacing';
+export { typography } from '@/theme/spacing';
+export { shadows } from '@/theme/shadows';

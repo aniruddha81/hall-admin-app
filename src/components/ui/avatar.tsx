@@ -1,7 +1,9 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/theme';
+import { resolveRemoteImageUrl } from '@/lib/media';
 
 function initials(name?: string | null) {
   if (!name) return '?';
@@ -20,27 +22,37 @@ type AvatarProps = {
 export function Avatar({ name, uri, size = 56, onPress, uploading }: AvatarProps) {
   const { colors, typography } = useTheme();
   const borderRadius = size / 2;
+  const imageUri = resolveRemoteImageUrl(uri);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUri]);
 
   const gradientColors = [colors.primary, colors.secondary, colors.tertiary] as const;
 
-  const content = uri ? (
-    <Image
-      source={{ uri }}
-      style={{ width: size, height: size, borderRadius }}
-      contentFit="cover"
-      accessibilityLabel={name ? `${name} profile photo` : 'Profile photo'}
-    />
-  ) : (
-    <LinearGradient
-      colors={gradientColors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.base, { width: size, height: size, borderRadius }]}>
-      <Text style={[styles.label, { fontSize: size * 0.36, fontFamily: typography.fonts.sans }]}>
-        {initials(name)}
-      </Text>
-    </LinearGradient>
-  );
+  const content =
+    imageUri && !imageFailed ? (
+      <Image
+        source={{ uri: imageUri }}
+        style={{ width: size, height: size, borderRadius }}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        recyclingKey={imageUri}
+        onError={() => setImageFailed(true)}
+        accessibilityLabel={name ? `${name} profile photo` : 'Profile photo'}
+      />
+    ) : (
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.base, { width: size, height: size, borderRadius }]}>
+        <Text style={[styles.label, { fontSize: size * 0.36, fontFamily: typography.fonts.sans }]}>
+          {initials(name)}
+        </Text>
+      </LinearGradient>
+    );
 
   const avatar = (
     <View style={{ width: size, height: size }}>

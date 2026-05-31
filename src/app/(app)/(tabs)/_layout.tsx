@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { setRootBackgroundColor } from '@/lib/safe-system-ui';
 import { useTheme } from '@/theme';
 
 type TabIconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -51,6 +52,17 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : insets.bottom;
   const tabBarHeight = 56 + bottomInset;
+
+  // Transparent Android nav bar shows the window background; match tab bar color.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    void setRootBackgroundColor(colors.tabBar);
+
+    return () => {
+      void setRootBackgroundColor(colors.background);
+    };
+  }, [colors.background, colors.tabBar]);
 
   return (
     <Tabs

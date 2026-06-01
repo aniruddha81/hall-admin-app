@@ -11,7 +11,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { IconBadge } from '@/components/ui/icon-badge';
 import { Input } from '@/components/ui/input';
 import { SectionHeader } from '@/components/ui/section-header';
-import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/theme';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
@@ -19,26 +18,39 @@ import {
   allocateSeat,
   createSeatCharge,
   getApplications,
+  getAvailableRooms,
   reviewApplication,
 } from '@/lib/services/admission.service';
-import { getRooms } from '@/lib/services/inventory.service';
-import { SEAT_APPLICATION_STATUSES, type Room, type SeatApplication, type SeatApplicationStatus } from '@/lib/types';
+import {
+  SEAT_APPLICATION_STATUSES,
+  type Hall,
+  type SeatApplication,
+  type SeatApplicationStatus,
+} from '@/lib/types';
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: '#F59E0B',
   APPROVED: '#2563EB',
   REJECTED: '#DC2626',
-  ALLOCATED: '#16A34A',
+};
+
+type AvailableRoom = {
+  id: string;
+  roomNumber: number;
+  hall: Hall;
+  capacity: number;
+  currentOccupancy: number;
 };
 
 export default function AdmissionsScreen() {
-  const { user } = useAuth();
   const { colors, spacing } = useTheme();
   const [statusFilter, setStatusFilter] = useState<SeatApplicationStatus | 'ALL'>('ALL');
   const [applications, setApplications] = useState<SeatApplication[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([]);
+  const [availableHalls, setAvailableHalls] = useState<Hall[]>([]);
   const [loading, setLoading] = useState(true);
   const [chargeAmounts, setChargeAmounts] = useState<Record<string, string>>({});
+  const [chargeHalls, setChargeHalls] = useState<Record<string, string>>({});
   const [roomSelections, setRoomSelections] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -46,16 +58,18 @@ export default function AdmissionsScreen() {
     try {
       const [appsRes, roomsRes] = await Promise.all([
         getApplications(statusFilter === 'ALL' ? undefined : { status: statusFilter }),
-        getRooms(user?.hall ? { hall: user.hall } : undefined),
+        getAvailableRooms(),
       ]);
       setApplications(appsRes.data.applications ?? []);
-      setRooms((roomsRes.data.rooms ?? []).filter((r) => r.currentOccupancy < r.capacity));
+      const rooms = (roomsRes.data?.rooms ?? []) as AvailableRoom[];
+      setAvailableRooms(rooms);
+      setAvailableHalls((roomsRes.data?.halls ?? []) as Hall[]);
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, user?.hall]);
+  }, [statusFilter]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -70,12 +84,17 @@ export default function AdmissionsScreen() {
 
   const createCharge = async (applicationId: string) => {
     const amount = Number(chargeAmounts[applicationId]);
+    const hall = chargeHalls[applicationId] as Hall | undefined;
     if (!amount) {
       Alert.alert('Invalid amount', 'Enter a seat charge amount.');
       return;
     }
+    if (!hall) {
+      Alert.alert('Select hall', 'Choose a hall with available seats.');
+      return;
+    }
     try {
-      await createSeatCharge(applicationId, { amount });
+      await createSeatCharge(applicationId, { amount, hall });
       await load();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
@@ -85,7 +104,7 @@ export default function AdmissionsScreen() {
   const allocate = async (applicationId: string) => {
     const roomId = roomSelections[applicationId];
     if (!roomId) {
-      Alert.alert('Select room', 'Choose a room to allocate.');
+      Alert.alert('Select room', 'Choose an available room to allocate.');
       return;
     }
     try {
@@ -97,13 +116,27 @@ export default function AdmissionsScreen() {
     }
   };
 
+  const roomOptions = availableRooms.map((r) => ({
+    id: r.id,
+    label: `${r.hall.replace(/_/g, ' ')} — Room ${r.roomNumber} (${r.currentOccupancy}/${r.capacity})`,
+  }));
+
   const filters: Array<SeatApplicationStatus | 'ALL'> = ['ALL', ...SEAT_APPLICATION_STATUSES];
 
   return (
-    <Screen title="Admissions" subtitle="Review applications & allocate seats" withBackButton loading={loading}>
+    <Screen
+      title="Seat Allocation"
+      subtitle="DSW — review applications & assign seats"
+      withBackButton
+      loading={loading}>
       <View style={styles.chipRow}>
         {filters.map((f) => (
-          <Chip key={f} label={f === 'ALL' ? 'All' : f} selected={statusFilter === f} onPress={() => setStatusFilter(f)} />
+          <Chip
+            key={f}
+            label={f === 'ALL' ? 'All' : f}
+            selected={statusFilter === f}
+            onPress={() => setStatusFilter(f)}
+          />
         ))}
       </View>
 
@@ -111,7 +144,11 @@ export default function AdmissionsScreen() {
         <EmptyState
           icon="assignment"
           title="No Applications Found"
-          message={statusFilter === 'ALL' ? 'No seat applications have been submitted yet.' : `No ${statusFilter.toLowerCase()} applications at this time.`}
+          message={
+            statusFilter === 'ALL'
+              ? 'No seat applications have been submitted yet.'
+              : `No ${statusFilter.toLowerCase()} applications at this time.`
+          }
         />
       ) : (
         applications.map((app) => {
@@ -129,24 +166,47 @@ export default function AdmissionsScreen() {
                   </ThemedText>
                 </View>
                 <View style={[styles.statusPill, { backgroundColor: `${accent}1A` }]}>
-                  <ThemedText type="smallBold" style={{ color: accent, fontSize: 11 }}>{app.status}</ThemedText>
+                  <ThemedText type="smallBold" style={{ color: accent, fontSize: 11 }}>
+                    {app.status}
+                  </ThemedText>
                 </View>
               </View>
 
               <ThemedText type="small" themeColor="textMuted">
                 Session {app.session}
-                {app.seatCharge ? ` · Charge ৳${app.seatCharge.amount} (${app.seatCharge.dueStatus})` : ''}
+                {app.hall ? ` · ${formatLabel(app.hall)}` : ' · Hall pending'}
+                {app.seatCharge
+                  ? ` · Charge ৳${app.seatCharge.amount} (${app.seatCharge.dueStatus})`
+                  : ''}
               </ThemedText>
 
               {app.status === 'PENDING' ? (
                 <View style={[styles.rowActions, { gap: spacing.sm }]}>
                   <Button title="Approve" size="sm" onPress={() => review(app.id, 'APPROVED')} />
-                  <Button title="Reject" size="sm" variant="outline" onPress={() => review(app.id, 'REJECTED')} />
+                  <Button
+                    title="Reject"
+                    size="sm"
+                    variant="outline"
+                    onPress={() => review(app.id, 'REJECTED')}
+                  />
                 </View>
               ) : null}
 
               {app.status === 'APPROVED' && !app.seatCharge ? (
                 <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+                  <ThemedText type="smallBold">Hall for charge</ThemedText>
+                  <View style={styles.chipRow}>
+                    {availableHalls.map((hall) => (
+                      <Chip
+                        key={hall}
+                        label={formatLabel(hall)}
+                        selected={chargeHalls[app.id] === hall}
+                        onPress={() =>
+                          setChargeHalls((p) => ({ ...p, [app.id]: hall }))
+                        }
+                      />
+                    ))}
+                  </View>
                   <Input
                     label="Seat charge (৳)"
                     icon="payments"
@@ -154,30 +214,40 @@ export default function AdmissionsScreen() {
                     value={chargeAmounts[app.id] ?? ''}
                     onChangeText={(v) => setChargeAmounts((p) => ({ ...p, [app.id]: v }))}
                   />
-                  <Button title="Create charge" size="sm" onPress={() => createCharge(app.id)} />
+                  <Button
+                    title="Create charge"
+                    size="sm"
+                    onPress={() => createCharge(app.id)}
+                    disabled={availableHalls.length === 0}
+                  />
                 </View>
               ) : null}
 
               {app.canAllocate ? (
                 <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-                  <ThemedText type="smallBold">Select room</ThemedText>
+                  <ThemedText type="smallBold">Available room</ThemedText>
                   <View style={styles.chipRow}>
-                    {rooms.map((r) => (
+                    {roomOptions.map((r) => (
                       <Chip
                         key={r.id}
-                        label={`Room ${r.roomNumber}`}
+                        label={r.label}
                         selected={roomSelections[app.id] === r.id}
                         onPress={() => setRoomSelections((p) => ({ ...p, [app.id]: r.id }))}
                       />
                     ))}
                   </View>
-                  <Button title="Allocate seat" size="sm" onPress={() => allocate(app.id)} />
+                  <Button
+                    title="Allocate seat"
+                    size="sm"
+                    onPress={() => allocate(app.id)}
+                    disabled={roomOptions.length === 0}
+                  />
                 </View>
               ) : null}
 
               {app.roomAllocation ? (
                 <ThemedText type="small" themeColor="textSecondary" style={{ marginTop: 8 }}>
-                  Allocated to room · {formatLabel(app.roomAllocation.allocatedByName)}
+                  Allocated · {formatLabel(app.roomAllocation.allocatedByName)}
                 </ThemedText>
               ) : null}
             </Card>

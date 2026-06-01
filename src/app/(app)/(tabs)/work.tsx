@@ -33,8 +33,8 @@ export default function WorkScreen() {
     },
     {
       key: 'admissions',
-      label: 'Admissions',
-      caption: 'Review & allocate seats',
+      label: 'Seat Allocation',
+      caption: 'DSW — review & assign seats',
       icon: 'assignment' as const,
       route: '/(app)/admissions' as const,
       roles: ADMISSION_ROLES,

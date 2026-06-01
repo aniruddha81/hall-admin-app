@@ -128,7 +128,7 @@ export default function DashboardScreen() {
           <FeatureTile icon="restaurant-menu" label="Dining" caption="Menus & tokens" accent={colors.primary} accentTint={`${colors.primary}12`} onPress={() => router.push('/(app)/dining')} />
         ) : null}
         {canAdmissions ? (
-          <FeatureTile icon="assignment" label="Admissions" caption="Review applications" accent={colors.tertiary} accentTint={`${colors.tertiary}12`} onPress={() => router.push('/(app)/admissions')} />
+          <FeatureTile icon="assignment" label="Seat Allocation" caption="DSW applications" accent={colors.tertiary} accentTint={`${colors.tertiary}12`} onPress={() => router.push('/(app)/admissions')} />
         ) : null}
         {canInventory ? (
           <FeatureTile icon="build" label="Inventory" caption="Rooms & complaints" accent={colors.secondary} accentTint={`${colors.secondary}12`} onPress={() => router.push('/(app)/inventory')} />

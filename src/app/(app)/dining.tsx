@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -13,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useTheme } from '@/theme';
+import { useScreenLoad } from '@/hooks/use-screen-load';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
 import {
@@ -38,8 +38,6 @@ export default function DiningScreen() {
   const [todayMenus, setTodayMenus] = useState<MealMenu[]>([]);
   const [bookings, setBookings] = useState<MealToken[]>([]);
   const [items, setItems] = useState<MealItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [itemName, setItemName] = useState('');
   const [mealType, setMealType] = useState<MealType>('LUNCH');
@@ -48,10 +46,8 @@ export default function DiningScreen() {
   const [totalTokens, setTotalTokens] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const { loading, error, reload } = useScreenLoad(
+    useCallback(async () => {
       const [tomorrow, today, bookingRes, itemRes] = await Promise.all([
         getTomorrowMenusList(),
         getTodayMenus(),
@@ -62,14 +58,9 @@ export default function DiningScreen() {
       setTodayMenus(today.data.menus);
       setBookings(bookingRes.data.bookings ?? []);
       setItems(itemRes.data.items ?? []);
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+    }, []),
+    [],
+  );
 
   const addItem = async () => {
     if (!itemName.trim()) return;
@@ -77,7 +68,7 @@ export default function DiningScreen() {
     try {
       await createMealItem({ name: itemName.trim() });
       setItemName('');
-      await load();
+      await reload();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     } finally {
@@ -88,7 +79,7 @@ export default function DiningScreen() {
   const toggleItemActive = async (item: MealItem) => {
     try {
       await updateMealItem(item.id, { isActive: !Boolean(item.isActive) });
-      await load();
+      await reload();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     }
@@ -103,7 +94,7 @@ export default function DiningScreen() {
         onPress: async () => {
           try {
             await deleteMealItem(id);
-            await load();
+            await reload();
           } catch (err) {
             Alert.alert('Error', getApiErrorMessage(err));
           }
@@ -128,7 +119,7 @@ export default function DiningScreen() {
       setPrice('');
       setTotalTokens('');
       setSelectedItems([]);
-      await load();
+      await reload();
       Alert.alert('Created', 'Tomorrow menu created.');
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
@@ -146,7 +137,7 @@ export default function DiningScreen() {
         onPress: async () => {
           try {
             await deleteTomorrowMenu(menuId);
-            await load();
+            await reload();
           } catch (err) {
             Alert.alert('Error', getApiErrorMessage(err));
           }
@@ -163,7 +154,7 @@ export default function DiningScreen() {
     }
     try {
       await markTokensAsConsumed({ tokenIds: ids });
-      await load();
+      await reload();
       Alert.alert('Done', `${ids.length} token(s) marked consumed.`);
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));

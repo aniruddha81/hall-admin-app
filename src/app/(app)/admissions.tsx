@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -12,6 +11,7 @@ import { IconBadge } from '@/components/ui/icon-badge';
 import { Input } from '@/components/ui/input';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useTheme } from '@/theme';
+import { useScreenLoad } from '@/hooks/use-screen-load';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
 import {
@@ -48,35 +48,32 @@ export default function AdmissionsScreen() {
   const [applications, setApplications] = useState<SeatApplication[]>([]);
   const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([]);
   const [availableHalls, setAvailableHalls] = useState<Hall[]>([]);
-  const [loading, setLoading] = useState(true);
   const [chargeAmounts, setChargeAmounts] = useState<Record<string, string>>({});
   const [chargeHalls, setChargeHalls] = useState<Record<string, string>>({});
   const [roomSelections, setRoomSelections] = useState<Record<string, string>>({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [appsRes, roomsRes] = await Promise.all([
-        getApplications(statusFilter === 'ALL' ? undefined : { status: statusFilter }),
-        getAvailableRooms(),
-      ]);
-      setApplications(appsRes.data.applications ?? []);
-      const rooms = (roomsRes.data?.rooms ?? []) as AvailableRoom[];
-      setAvailableRooms(rooms);
-      setAvailableHalls((roomsRes.data?.halls ?? []) as Hall[]);
-    } catch (err) {
-      Alert.alert('Error', getApiErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter]);
-
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  const { loading, reload } = useScreenLoad(
+    useCallback(async () => {
+      try {
+        const [appsRes, roomsRes] = await Promise.all([
+          getApplications(statusFilter === 'ALL' ? undefined : { status: statusFilter }),
+          getAvailableRooms(),
+        ]);
+        setApplications(appsRes.data.applications ?? []);
+        const rooms = (roomsRes.data?.rooms ?? []) as AvailableRoom[];
+        setAvailableRooms(rooms);
+        setAvailableHalls((roomsRes.data?.halls ?? []) as Hall[]);
+      } catch (err) {
+        Alert.alert('Error', getApiErrorMessage(err));
+      }
+    }, [statusFilter]),
+    [statusFilter],
+  );
 
   const review = async (id: string, status: 'APPROVED' | 'REJECTED') => {
     try {
       await reviewApplication(id, { status });
-      await load();
+      await reload();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     }
@@ -95,7 +92,7 @@ export default function AdmissionsScreen() {
     }
     try {
       await createSeatCharge(applicationId, { amount, hall });
-      await load();
+      await reload();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     }
@@ -109,7 +106,7 @@ export default function AdmissionsScreen() {
     }
     try {
       await allocateSeat({ applicationId, roomId });
-      await load();
+      await reload();
       Alert.alert('Allocated', 'Seat allocated successfully.');
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));

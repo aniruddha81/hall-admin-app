@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +13,7 @@ import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/theme';
+import { useScreenLoad } from '@/hooks/use-screen-load';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
 import { getDamageReports, getRooms, markDamageFixed, verifyDamageReport } from '@/lib/services/inventory.service';
@@ -27,28 +27,25 @@ export default function InventoryScreen() {
   const [tab, setTab] = useState<TabKey>('complaints');
   const [reports, setReports] = useState<DamageReport[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
   const [fineAmounts, setFineAmounts] = useState<Record<string, string>>({});
   const [managerNotes, setManagerNotes] = useState<Record<string, string>>({});
   const [responsible, setResponsible] = useState<Record<string, boolean>>({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [reportsRes, roomsRes] = await Promise.all([
-        getDamageReports(),
-        getRooms(user?.hall ? { hall: user.hall } : undefined),
-      ]);
-      setReports((reportsRes.data.reports ?? []).filter((r) => r.status !== 'FIXED'));
-      setRooms(roomsRes.data.rooms ?? []);
-    } catch (err) {
-      Alert.alert('Error', getApiErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.hall]);
-
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  const { loading, reload } = useScreenLoad(
+    useCallback(async () => {
+      try {
+        const [reportsRes, roomsRes] = await Promise.all([
+          getDamageReports(),
+          getRooms(user?.hall ? { hall: user.hall } : undefined),
+        ]);
+        setReports((reportsRes.data.reports ?? []).filter((r) => r.status !== 'FIXED'));
+        setRooms(roomsRes.data.rooms ?? []);
+      } catch (err) {
+        Alert.alert('Error', getApiErrorMessage(err));
+      }
+    }, [user?.hall]),
+    [user?.hall],
+  );
 
   const verify = async (report: DamageReport) => {
     const isStudentResponsible = responsible[report.id] ?? true;
@@ -59,7 +56,7 @@ export default function InventoryScreen() {
         damageCost: !isStudentResponsible ? Number(fineAmounts[report.id] ?? 0) : undefined,
         managerNote: managerNotes[report.id],
       });
-      await load();
+      await reload();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     }
@@ -68,7 +65,7 @@ export default function InventoryScreen() {
   const markFixed = async (id: string) => {
     try {
       await markDamageFixed(id);
-      await load();
+      await reload();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     }

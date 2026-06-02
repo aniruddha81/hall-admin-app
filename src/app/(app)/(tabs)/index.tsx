@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { GradientHeader } from '@/components/gradient-header';
@@ -13,7 +13,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { StatTile } from '@/components/ui/stat-tile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/theme';
-import { getApiErrorMessage } from '@/lib/api';
+import { useScreenLoad } from '@/hooks/use-screen-load';
 import {
   ADMISSION_ROLES,
   DINING_ROLES,
@@ -32,39 +32,31 @@ export default function DashboardScreen() {
   const [todayMenus, setTodayMenus] = useState<MealMenu[]>([]);
   const [tomorrowMenus, setTomorrowMenus] = useState<MealMenu[]>([]);
   const [pendingApps, setPendingApps] = useState<SeatApplication[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const canDining = hasRoleAccess(user?.designation, DINING_ROLES);
   const canAdmissions = hasRoleAccess(user?.designation, ADMISSION_ROLES);
   const canInventory = hasRoleAccess(user?.designation, INVENTORY_ROLES);
   const canFinance = hasRoleAccess(user?.designation, FINANCE_ROLES);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const tasks: Promise<unknown>[] = [];
-        if (canDining) {
-          tasks.push(
-            getTodayMenus().then((r) => setTodayMenus(r.data.menus)),
-            getTomorrowMenusList().then((r) => setTomorrowMenus(r.data.menus)),
-          );
-        }
-        if (canAdmissions) {
-          tasks.push(
-            getApplications({ status: 'PENDING' }).then((r) =>
-              setPendingApps(r.data.applications ?? []),
-            ),
-          );
-        }
-        await Promise.allSettled(tasks);
-      } catch (err) {
-        setError(getApiErrorMessage(err));
-      } finally {
-        setLoading(false);
+  const { loading, error } = useScreenLoad(
+    useCallback(async () => {
+      const tasks: Promise<unknown>[] = [];
+      if (canDining) {
+        tasks.push(
+          getTodayMenus().then((r) => setTodayMenus(r.data.menus)),
+          getTomorrowMenusList().then((r) => setTomorrowMenus(r.data.menus)),
+        );
       }
-    })();
-  }, [canDining, canAdmissions]);
+      if (canAdmissions) {
+        tasks.push(
+          getApplications({ status: 'PENDING' }).then((r) =>
+            setPendingApps(r.data.applications ?? []),
+          ),
+        );
+      }
+      await Promise.allSettled(tasks);
+    }, [canDining, canAdmissions]),
+    [canDining, canAdmissions],
+  );
 
   const header = (
     <GradientHeader extraBottom={40}>

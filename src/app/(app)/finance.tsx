@@ -1,7 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useState } from 'react';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 
 import { GradientHeader } from '@/components/gradient-header';
 import { Screen } from '@/components/screen';
@@ -16,6 +15,7 @@ import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/theme';
+import { useScreenLoad } from '@/hooks/use-screen-load';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
 import {
@@ -52,22 +52,13 @@ export default function FinanceScreen() {
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const loadExpenses = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { loading: expensesLoading, reload: reloadExpenses } = useScreenLoad(
+    useCallback(async () => {
+      if (tab !== 'expenses') return;
       const res = await getExpenses(user?.hall ? { hall: user.hall } : undefined);
       setExpenses(res.data.expenses ?? []);
-    } catch (err) {
-      Alert.alert('Error', getApiErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.hall]);
-
-  useFocusEffect(
-    useCallback(() => {
-      if (tab === 'expenses') void loadExpenses();
-    }, [tab, loadExpenses]),
+    }, [tab, user?.hall]),
+    [tab, user?.hall],
   );
 
   const pickReceipt = async () => {
@@ -125,7 +116,7 @@ export default function FinanceScreen() {
       setExpenseTitle('');
       setExpenseAmount('');
       setExpenseCategory('');
-      await loadExpenses();
+      await reloadExpenses();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     } finally {
@@ -142,7 +133,9 @@ export default function FinanceScreen() {
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (tab === 'ledger') {
+        setLoading(false);
+      }
     }
   };
 
@@ -178,7 +171,7 @@ export default function FinanceScreen() {
   );
 
   return (
-    <Screen header={header} overlap={24} withBackButton loading={loading && tab === 'expenses'}>
+    <Screen header={header} overlap={24} withBackButton loading={(tab === 'expenses' && expensesLoading) || (tab === 'ledger' && loading)}>
       <View style={styles.chipRow}>
         <Chip label="Dues" selected={tab === 'dues'} onPress={() => setTab('dues')} />
         <Chip label="Expenses" selected={tab === 'expenses'} onPress={() => setTab('expenses')} />

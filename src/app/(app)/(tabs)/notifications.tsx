@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 
 import { GradientHeader } from '@/components/gradient-header';
 import { Screen } from '@/components/screen';
@@ -14,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useTheme } from '@/theme';
+import { useScreenLoad } from '@/hooks/use-screen-load';
 import { getApiErrorMessage } from '@/lib/api';
 import { createNotification, getMyNotifications, markNotificationAsRead } from '@/lib/services/notification.service';
 import { NOTIFICATION_AUDIENCES, type NotificationAudience, type NotificationItem } from '@/lib/types';
@@ -25,26 +25,15 @@ export default function NotificationsScreen() {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [audience, setAudience] = useState<NotificationAudience>('STUDENT');
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
+  const { loading, error, setError, reload } = useScreenLoad(
+    useCallback(async () => {
       const res = await getMyNotifications(25);
       setNotifications(res.data.notifications ?? []);
       setUnreadCount(res.data.unreadCount ?? 0);
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
+    }, []),
+    [],
   );
 
   const sendNotification = async () => {
@@ -59,7 +48,7 @@ export default function NotificationsScreen() {
       setTitle('');
       setMessage('');
       Alert.alert('Sent', 'Notification broadcast successfully.');
-      await load();
+      await reload();
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -74,7 +63,7 @@ export default function NotificationsScreen() {
     }
     try {
       await markNotificationAsRead(id);
-      await load();
+      await reload();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     }

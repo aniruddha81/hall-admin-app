@@ -1,4 +1,4 @@
-import { apiRequest } from '@/lib/api';
+import { apiRequest, type ApiFetchOptions } from '@/lib/api';
 import type {
   ApiResponse,
   DailyReport,
@@ -48,18 +48,26 @@ async function normalizeMenusResponse(res: ApiResponse<Array<MealMenu & { menuId
   return { ...res, data: { menus } };
 }
 
-export async function getTomorrowMenusList() {
-  const { data } = await apiRequest<Array<MealMenu & { menuId?: string }>>('/dining/menus/tomorrow');
+export async function getTomorrowMenusList(options?: ApiFetchOptions) {
+  const { data } = await apiRequest<Array<MealMenu & { menuId?: string }>>(
+    '/dining/menus/tomorrow',
+    { signal: options?.signal },
+  );
   return normalizeMenusResponse(data);
 }
 
-export async function getTodayMenus() {
-  const { data } = await apiRequest<Array<MealMenu & { menuId?: string }>>('/dining/menus/today');
+export async function getTodayMenus(options?: ApiFetchOptions) {
+  const { data } = await apiRequest<Array<MealMenu & { menuId?: string }>>(
+    '/dining/menus/today',
+    { signal: options?.signal },
+  );
   return normalizeMenusResponse(data);
 }
 
-export async function getMealItems() {
-  const { data } = await apiRequest<{ items: MealItem[] }>('/dining/meal-items');
+export async function getMealItems(options?: ApiFetchOptions) {
+  const { data } = await apiRequest<{ items: MealItem[] }>('/dining/meal-items', {
+    signal: options?.signal,
+  });
   return data;
 }
 
@@ -94,8 +102,10 @@ export async function getAllBookingsForMenu(menuId: string) {
   return data;
 }
 
-export async function getTomorrowBookings() {
-  const { data } = await apiRequest<{ bookings: MealToken[] }>('/dining/bookings/tomorrow');
+export async function getTomorrowBookings(options?: ApiFetchOptions) {
+  const { data } = await apiRequest<{ bookings: MealToken[] }>('/dining/bookings/tomorrow', {
+    signal: options?.signal,
+  });
   return data;
 }
 

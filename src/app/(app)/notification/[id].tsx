@@ -8,6 +8,8 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { IconBadge } from '@/components/ui/icon-badge';
+import { useInvalidateNotificationQueries } from '@/hooks/queries/notifications';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useTheme } from '@/theme';
 import { getApiErrorMessage } from '@/lib/api';
 import { markNotificationAsRead } from '@/lib/services/notification.service';
@@ -48,6 +50,8 @@ export default function NotificationDetailScreen() {
   const createdByName = params.createdByName || 'Hall Admin';
 
   const statusLabel = useMemo(() => (isRead ? 'Read' : 'Unread'), [isRead]);
+  const invalidateNotifications = useInvalidateNotificationQueries();
+  const { onRefresh, refreshing } = usePullToRefresh(invalidateNotifications);
 
   const markRead = async () => {
     if (!notificationId || isRead) return;
@@ -63,7 +67,7 @@ export default function NotificationDetailScreen() {
   };
 
   return (
-    <Screen title="Notification" withBackButton>
+    <Screen title="Notification" withBackButton onRefresh={onRefresh} refreshing={refreshing}>
       <Card
         style={[
           styles.hero,

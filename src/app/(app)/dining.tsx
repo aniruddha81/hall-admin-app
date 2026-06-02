@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
@@ -12,7 +12,11 @@ import { Input } from '@/components/ui/input';
 import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useTheme } from '@/theme';
-import { useScreenLoad } from '@/hooks/use-screen-load';
+import {
+  useAdminDiningPanelQuery,
+  useInvalidateDiningQueries,
+} from '@/hooks/queries/dining';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
 import {
@@ -20,10 +24,6 @@ import {
   createTomorrowMenu,
   deleteMealItem,
   deleteTomorrowMenu,
-  getMealItems,
-  getTodayMenus,
-  getTomorrowBookings,
-  getTomorrowMenusList,
   markTokensAsConsumed,
   updateMealItem,
 } from '@/lib/services/dining.service';
@@ -34,10 +34,13 @@ type TabKey = 'tomorrow' | 'today' | 'bookings' | 'items';
 export default function DiningScreen() {
   const { colors, spacing, radius } = useTheme();
   const [tab, setTab] = useState<TabKey>('tomorrow');
-  const [tomorrowMenus, setTomorrowMenus] = useState<MealMenu[]>([]);
-  const [todayMenus, setTodayMenus] = useState<MealMenu[]>([]);
-  const [bookings, setBookings] = useState<MealToken[]>([]);
-  const [items, setItems] = useState<MealItem[]>([]);
+  const panelQuery = useAdminDiningPanelQuery();
+  const invalidateDining = useInvalidateDiningQueries();
+  const tomorrowMenus = panelQuery.data?.tomorrowMenus ?? [];
+  const todayMenus = panelQuery.data?.todayMenus ?? [];
+  const bookings = panelQuery.data?.bookings ?? [];
+  const items = panelQuery.data?.items ?? [];
+  const loading = panelQuery.isLoading && !panelQuery.data;
 
   const [itemName, setItemName] = useState('');
   const [mealType, setMealType] = useState<MealType>('LUNCH');
@@ -46,21 +49,11 @@ export default function DiningScreen() {
   const [totalTokens, setTotalTokens] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const { loading, error, reload } = useScreenLoad(
-    useCallback(async () => {
-      const [tomorrow, today, bookingRes, itemRes] = await Promise.all([
-        getTomorrowMenusList(),
-        getTodayMenus(),
-        getTomorrowBookings(),
-        getMealItems(),
-      ]);
-      setTomorrowMenus(tomorrow.data.menus);
-      setTodayMenus(today.data.menus);
-      setBookings(bookingRes.data.bookings ?? []);
-      setItems(itemRes.data.items ?? []);
-    }, []),
-    [],
-  );
+  const reload = async () => {
+    await invalidateDining();
+  };
+
+  const { onRefresh, refreshing } = usePullToRefresh(() => panelQuery.refetch());
 
   const addItem = async () => {
     if (!itemName.trim()) return;
@@ -192,10 +185,17 @@ export default function DiningScreen() {
   };
 
   return (
-    <Screen title="Dining" subtitle="Manage menus, items & bookings" withBackButton loading={loading}>
-      {error ? (
+    <Screen
+      title="Dining"
+      subtitle="Manage menus, items & bookings"
+      withBackButton
+      loading={loading}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+    >
+      {panelQuery.error ? (
         <View style={[styles.errorBox, { backgroundColor: `${colors.error}14`, borderColor: `${colors.error}30` }]}>
-          <ThemedText type="small" style={{ color: colors.error }}>{error}</ThemedText>
+          <ThemedText type="small" style={{ color: colors.error }}>{panelQuery.error}</ThemedText>
         </View>
       ) : null}
 

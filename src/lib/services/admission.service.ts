@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api";
+import { apiRequest, type ApiFetchOptions } from "@/lib/api";
 import type {
   Pagination,
   SeatAllocation,
@@ -44,16 +44,19 @@ function mapApplication(raw: RawSeatApplication): SeatApplication {
   };
 }
 
-export async function getApplications(params?: {
-  status?: SeatApplicationStatus;
-  hall?: string;
-  page?: number;
-  limit?: number;
-}) {
+export async function getApplications(
+  params?: {
+    status?: SeatApplicationStatus;
+    hall?: string;
+    page?: number;
+    limit?: number;
+  },
+  fetchOptions?: ApiFetchOptions,
+) {
   const { data } = await apiRequest<{
     applications: RawSeatApplication[];
     pagination: Pagination;
-  }>("/admission/applications", { params });
+  }>("/admission/applications", { params, signal: fetchOptions?.signal });
 
   return {
     ...data,
@@ -75,7 +78,10 @@ export async function reviewApplication(
   return data;
 }
 
-export async function getAvailableRooms(params?: { hall?: string }) {
+export async function getAvailableRooms(
+  params?: { hall?: string },
+  fetchOptions?: ApiFetchOptions,
+) {
   const { data } = await apiRequest<{
     halls: string[];
     rooms: Array<{
@@ -86,7 +92,7 @@ export async function getAvailableRooms(params?: { hall?: string }) {
       currentOccupancy: number;
       status: string;
     }>;
-  }>("/admission/available-rooms", { params });
+  }>("/admission/available-rooms", { params, signal: fetchOptions?.signal });
   return data;
 }
 

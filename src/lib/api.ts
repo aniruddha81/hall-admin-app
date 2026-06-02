@@ -22,6 +22,10 @@ export class ApiError extends Error {
   }
 }
 
+export type ApiFetchOptions = {
+  signal?: AbortSignal;
+};
+
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
   formData?: FormData;
@@ -45,27 +49,9 @@ export function isRequestAborted(error: unknown): boolean {
 }
 
 let onUnauthorized: (() => void) | null = null;
-let scopedAbortSignal: AbortSignal | undefined;
 
 export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler;
-}
-
-/** Runs async work with `signal` applied to nested `apiRequest` calls. */
-export async function runWithAbortSignal<T>(
-  signal: AbortSignal,
-  fn: () => Promise<T>,
-): Promise<T> {
-  if (signal.aborted) {
-    throw new DOMException('Aborted', 'AbortError');
-  }
-  const previous = scopedAbortSignal;
-  scopedAbortSignal = signal;
-  try {
-    return await fn();
-  } finally {
-    scopedAbortSignal = previous;
-  }
 }
 
 function buildUrl(path: string, params?: RequestOptions['params']): string {
@@ -104,7 +90,7 @@ export async function apiRequest<T>(
 ): Promise<{ data: ApiResponse<T>; sessionId?: string }> {
   const { body, formData, skipAuth: _skipAuth, params, signal: requestSignal, ...fetchOptions } =
     options;
-  const signal = requestSignal ?? scopedAbortSignal;
+  const signal = requestSignal;
   const url = buildUrl(path, params);
   const hasJsonBody = body !== undefined;
   const headers = await buildHeaders(options, hasJsonBody);
@@ -127,7 +113,16 @@ export async function apiRequest<T>(
   }
   const sessionId = extractSessionIdFromHeaders(response.headers);
 
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
   const raw = await response.text();
+
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
   let payload: ApiResponse<T> | ApiErrorBody;
   try {
     if (!raw.trim()) {
@@ -137,7 +132,10 @@ export async function apiRequest<T>(
       throw new Error('Server returned HTML instead of JSON');
     }
     payload = JSON.parse(raw) as ApiResponse<T>;
-  } catch {
+  } catch (parseError) {
+    if (signal?.aborted || isRequestAborted(parseError)) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
     throw new ApiError(
       response.status,
       raw.trimStart().startsWith('<')

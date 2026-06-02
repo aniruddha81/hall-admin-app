@@ -1,4 +1,4 @@
-import { apiRequest } from '@/lib/api';
+import { apiRequest, type ApiFetchOptions } from '@/lib/api';
 import { appendImageToFormData } from '@/lib/multipart';
 import type {
   DueType,
@@ -118,8 +118,14 @@ export async function createExpense(body: {
   return data;
 }
 
-export async function getExpenses(params?: { hall?: Hall; page?: number; limit?: number }) {
-  const { data } = await apiRequest<{ expenses: Expense[] }>('/finance/expenses', { params });
+export async function getExpenses(
+  params?: { hall?: Hall; page?: number; limit?: number },
+  fetchOptions?: ApiFetchOptions,
+) {
+  const { data } = await apiRequest<{ expenses: Expense[] }>('/finance/expenses', {
+    params,
+    signal: fetchOptions?.signal,
+  });
   return data;
 }
 

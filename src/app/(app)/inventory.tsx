@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
@@ -13,11 +13,15 @@ import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/theme';
-import { useScreenLoad } from '@/hooks/use-screen-load';
+import {
+  useInventoryPanelQuery,
+  useInvalidateInventoryQueries,
+} from '@/hooks/queries/inventory';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
-import { getDamageReports, getRooms, markDamageFixed, verifyDamageReport } from '@/lib/services/inventory.service';
-import type { DamageReport, Room } from '@/lib/types';
+import { markDamageFixed, verifyDamageReport } from '@/lib/services/inventory.service';
+import type { DamageReport } from '@/lib/types';
 
 type TabKey = 'complaints' | 'rooms';
 
@@ -25,27 +29,21 @@ export default function InventoryScreen() {
   const { user } = useAuth();
   const { colors, spacing } = useTheme();
   const [tab, setTab] = useState<TabKey>('complaints');
-  const [reports, setReports] = useState<DamageReport[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const panelQuery = useInventoryPanelQuery(user?.hall);
+  const invalidateInventory = useInvalidateInventoryQueries();
+  const reports = panelQuery.data?.reports ?? [];
+  const rooms = panelQuery.data?.rooms ?? [];
+  const loading = panelQuery.isLoading && !panelQuery.data;
+
   const [fineAmounts, setFineAmounts] = useState<Record<string, string>>({});
   const [managerNotes, setManagerNotes] = useState<Record<string, string>>({});
   const [responsible, setResponsible] = useState<Record<string, boolean>>({});
 
-  const { loading, reload } = useScreenLoad(
-    useCallback(async () => {
-      try {
-        const [reportsRes, roomsRes] = await Promise.all([
-          getDamageReports(),
-          getRooms(user?.hall ? { hall: user.hall } : undefined),
-        ]);
-        setReports((reportsRes.data.reports ?? []).filter((r) => r.status !== 'FIXED'));
-        setRooms(roomsRes.data.rooms ?? []);
-      } catch (err) {
-        Alert.alert('Error', getApiErrorMessage(err));
-      }
-    }, [user?.hall]),
-    [user?.hall],
-  );
+  const reload = async () => {
+    await invalidateInventory();
+  };
+
+  const { onRefresh, refreshing } = usePullToRefresh(() => panelQuery.refetch());
 
   const verify = async (report: DamageReport) => {
     const isStudentResponsible = responsible[report.id] ?? true;
@@ -72,7 +70,14 @@ export default function InventoryScreen() {
   };
 
   return (
-    <Screen title="Inventory" subtitle="Rooms & damage reports" withBackButton loading={loading}>
+    <Screen
+      title="Inventory"
+      subtitle="Rooms & damage reports"
+      withBackButton
+      loading={loading}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+    >
       <View style={styles.chipRow}>
         <Chip label="Complaints" selected={tab === 'complaints'} onPress={() => setTab('complaints')} />
         <Chip label="Rooms" selected={tab === 'rooms'} onPress={() => setTab('rooms')} />

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { GradientHeader } from '@/components/gradient-header';
@@ -13,28 +13,31 @@ import { Input } from '@/components/ui/input';
 import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useTheme } from '@/theme';
-import { useScreenLoad } from '@/hooks/use-screen-load';
+import {
+  useAdminNotificationsQuery,
+  useInvalidateNotificationQueries,
+} from '@/hooks/queries/notifications';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { getApiErrorMessage } from '@/lib/api';
-import { createNotification, getMyNotifications, markNotificationAsRead } from '@/lib/services/notification.service';
+import { createNotification, markNotificationAsRead } from '@/lib/services/notification.service';
 import { NOTIFICATION_AUDIENCES, type NotificationAudience, type NotificationItem } from '@/lib/types';
 
 export default function NotificationsScreen() {
   const { colors, spacing } = useTheme();
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const notificationsQuery = useAdminNotificationsQuery();
+  const invalidateNotifications = useInvalidateNotificationQueries();
+  const notifications = notificationsQuery.data?.notifications ?? [];
+  const unreadCount = notificationsQuery.data?.unreadCount ?? 0;
+  const loading = notificationsQuery.isLoading && !notificationsQuery.data;
+
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [audience, setAudience] = useState<NotificationAudience>('STUDENT');
   const [sending, setSending] = useState(false);
 
-  const { loading, error, setError, reload } = useScreenLoad(
-    useCallback(async () => {
-      const res = await getMyNotifications(25);
-      setNotifications(res.data.notifications ?? []);
-      setUnreadCount(res.data.unreadCount ?? 0);
-    }, []),
-    [],
-  );
+  const [error, setError] = useState<string | null>(null);
+  const queryError = notificationsQuery.error;
+  const { onRefresh, refreshing } = usePullToRefresh(() => notificationsQuery.refetch());
 
   const sendNotification = async () => {
     if (!title.trim() || !message.trim()) {
@@ -48,7 +51,7 @@ export default function NotificationsScreen() {
       setTitle('');
       setMessage('');
       Alert.alert('Sent', 'Notification broadcast successfully.');
-      await reload();
+      await invalidateNotifications();
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -63,7 +66,7 @@ export default function NotificationsScreen() {
     }
     try {
       await markNotificationAsRead(id);
-      await reload();
+      await invalidateNotifications();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     }
@@ -108,10 +111,16 @@ export default function NotificationsScreen() {
   );
 
   return (
-    <Screen header={header} overlap={24} loading={loading}>
-      {error ? (
+    <Screen
+      header={header}
+      overlap={24}
+      loading={loading}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+    >
+      {(error || queryError) ? (
         <View style={[styles.errorBox, { backgroundColor: `${colors.error}14`, borderColor: `${colors.error}30` }]}>
-          <ThemedText type="small" style={{ color: colors.error }}>{error}</ThemedText>
+          <ThemedText type="small" style={{ color: colors.error }}>{error || queryError}</ThemedText>
         </View>
       ) : null}
 

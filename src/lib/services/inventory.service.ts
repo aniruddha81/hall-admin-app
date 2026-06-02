@@ -1,4 +1,4 @@
-import { apiRequest } from '@/lib/api';
+import { apiRequest, type ApiFetchOptions } from '@/lib/api';
 import type { DamageReport, DamageReportStatus, Hall, Room, RoomStatus } from '@/lib/types';
 
 type RawRoom = {
@@ -25,16 +25,28 @@ function mapRoom(raw: RawRoom): Room {
   };
 }
 
-export async function getRooms(params?: { hall?: Hall; status?: RoomStatus }) {
-  const { data } = await apiRequest<RawRoom[]>('/inventory/rooms', { params });
+export async function getRooms(
+  params?: { hall?: Hall; status?: RoomStatus },
+  fetchOptions?: ApiFetchOptions,
+) {
+  const { data } = await apiRequest<RawRoom[]>('/inventory/rooms', {
+    params,
+    signal: fetchOptions?.signal,
+  });
   return {
     ...data,
     data: { rooms: (data.data ?? []).map(mapRoom) },
   };
 }
 
-export async function getDamageReports(params?: { status?: DamageReportStatus }) {
-  const { data } = await apiRequest<DamageReport[]>('/inventory/damage', { params });
+export async function getDamageReports(
+  params?: { status?: DamageReportStatus },
+  fetchOptions?: ApiFetchOptions,
+) {
+  const { data } = await apiRequest<DamageReport[]>('/inventory/damage', {
+    params,
+    signal: fetchOptions?.signal,
+  });
   return {
     ...data,
     data: { reports: data.data ?? [] },

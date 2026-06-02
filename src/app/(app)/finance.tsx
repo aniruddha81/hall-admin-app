@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
 
 import { GradientHeader } from '@/components/gradient-header';
@@ -15,13 +15,16 @@ import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/theme';
-import { useScreenLoad } from '@/hooks/use-screen-load';
+import {
+  useAdminExpensesQuery,
+  useInvalidateFinanceQueries,
+} from '@/hooks/queries/finance';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
 import {
   createDue,
   createExpense,
-  getExpenses,
   getStudentLedger,
   payDue,
   verifyMealPaymentReceipt,
@@ -35,7 +38,9 @@ export default function FinanceScreen() {
   const { user } = useAuth();
   const { colors, spacing, radius, typography } = useTheme();
   const [tab, setTab] = useState<TabKey>('dues');
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const expensesQuery = useAdminExpensesQuery(user?.hall, tab === 'expenses');
+  const invalidateFinance = useInvalidateFinanceQueries();
+  const expenses = expensesQuery.data ?? [];
   const [ledger, setLedger] = useState<StudentLedger | null>(null);
   const [loading, setLoading] = useState(false);
   const [studentId, setStudentId] = useState('');
@@ -52,14 +57,15 @@ export default function FinanceScreen() {
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const { loading: expensesLoading, reload: reloadExpenses } = useScreenLoad(
-    useCallback(async () => {
-      if (tab !== 'expenses') return;
-      const res = await getExpenses(user?.hall ? { hall: user.hall } : undefined);
-      setExpenses(res.data.expenses ?? []);
-    }, [tab, user?.hall]),
-    [tab, user?.hall],
-  );
+  const expensesLoading = expensesQuery.isLoading && !expensesQuery.data;
+
+  const { onRefresh, refreshing } = usePullToRefresh(async () => {
+    if (tab === 'expenses') {
+      await expensesQuery.refetch();
+    } else if (tab === 'ledger' && studentId.trim()) {
+      await lookupLedger();
+    }
+  });
 
   const pickReceipt = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -116,7 +122,7 @@ export default function FinanceScreen() {
       setExpenseTitle('');
       setExpenseAmount('');
       setExpenseCategory('');
-      await reloadExpenses();
+      await invalidateFinance();
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
     } finally {
@@ -171,7 +177,14 @@ export default function FinanceScreen() {
   );
 
   return (
-    <Screen header={header} overlap={24} withBackButton loading={(tab === 'expenses' && expensesLoading) || (tab === 'ledger' && loading)}>
+    <Screen
+      header={header}
+      overlap={24}
+      withBackButton
+      loading={(tab === 'expenses' && expensesLoading) || (tab === 'ledger' && loading)}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+    >
       <View style={styles.chipRow}>
         <Chip label="Dues" selected={tab === 'dues'} onPress={() => setTab('dues')} />
         <Chip label="Expenses" selected={tab === 'expenses'} onPress={() => setTab('expenses')} />

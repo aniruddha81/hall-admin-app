@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { GradientHeader } from '@/components/gradient-header';
@@ -13,7 +12,12 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { StatTile } from '@/components/ui/stat-tile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/theme';
-import { useScreenLoad } from '@/hooks/use-screen-load';
+import { usePendingApplicationsQuery } from '@/hooks/queries/admission';
+import {
+  useAdminTodayMenusQuery,
+  useAdminTomorrowMenusQuery,
+} from '@/hooks/queries/dining';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import {
   ADMISSION_ROLES,
   DINING_ROLES,
@@ -22,41 +26,39 @@ import {
   formatLabel,
   hasRoleAccess,
 } from '@/lib/roles';
-import { getApplications } from '@/lib/services/admission.service';
-import { getTodayMenus, getTomorrowMenusList } from '@/lib/services/dining.service';
-import type { MealMenu, SeatApplication } from '@/lib/types';
 
 export default function DashboardScreen() {
   const { user } = useAuth();
   const { colors, spacing, radius } = useTheme();
-  const [todayMenus, setTodayMenus] = useState<MealMenu[]>([]);
-  const [tomorrowMenus, setTomorrowMenus] = useState<MealMenu[]>([]);
-  const [pendingApps, setPendingApps] = useState<SeatApplication[]>([]);
   const canDining = hasRoleAccess(user?.designation, DINING_ROLES);
   const canAdmissions = hasRoleAccess(user?.designation, ADMISSION_ROLES);
   const canInventory = hasRoleAccess(user?.designation, INVENTORY_ROLES);
   const canFinance = hasRoleAccess(user?.designation, FINANCE_ROLES);
 
-  const { loading, error } = useScreenLoad(
-    useCallback(async () => {
-      const tasks: Promise<unknown>[] = [];
-      if (canDining) {
-        tasks.push(
-          getTodayMenus().then((r) => setTodayMenus(r.data.menus)),
-          getTomorrowMenusList().then((r) => setTomorrowMenus(r.data.menus)),
-        );
-      }
-      if (canAdmissions) {
-        tasks.push(
-          getApplications({ status: 'PENDING' }).then((r) =>
-            setPendingApps(r.data.applications ?? []),
-          ),
-        );
-      }
-      await Promise.allSettled(tasks);
-    }, [canDining, canAdmissions]),
-    [canDining, canAdmissions],
-  );
+  const todayMenusQuery = useAdminTodayMenusQuery(canDining);
+  const tomorrowMenusQuery = useAdminTomorrowMenusQuery(canDining);
+  const pendingAppsQuery = usePendingApplicationsQuery(canAdmissions);
+  const todayMenus = todayMenusQuery.data?.data.menus ?? [];
+  const tomorrowMenus = tomorrowMenusQuery.data?.data.menus ?? [];
+  const pendingApps = pendingAppsQuery.data ?? [];
+  const loading =
+    (canDining &&
+      ((todayMenusQuery.isLoading && !todayMenusQuery.data) ||
+        (tomorrowMenusQuery.isLoading && !tomorrowMenusQuery.data))) ||
+    (canAdmissions && pendingAppsQuery.isLoading && !pendingAppsQuery.data);
+  const error =
+    todayMenusQuery.error || tomorrowMenusQuery.error || pendingAppsQuery.error;
+
+  const { onRefresh, refreshing } = usePullToRefresh(async () => {
+    const tasks: Array<Promise<unknown>> = [];
+    if (canDining) {
+      tasks.push(todayMenusQuery.refetch(), tomorrowMenusQuery.refetch());
+    }
+    if (canAdmissions) {
+      tasks.push(pendingAppsQuery.refetch());
+    }
+    await Promise.all(tasks);
+  });
 
   const header = (
     <GradientHeader extraBottom={40}>
@@ -95,7 +97,13 @@ export default function DashboardScreen() {
   );
 
   return (
-    <Screen header={header} overlap={28} loading={loading}>
+    <Screen
+      header={header}
+      overlap={28}
+      loading={loading}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+    >
       {error ? (
         <View style={[styles.errorBox, { backgroundColor: `${colors.error}14`, borderColor: `${colors.error}30` }]}>
           <ThemedText type="small" style={{ color: colors.error }}>{error}</ThemedText>

@@ -8,6 +8,7 @@ import { SystemChrome } from '@/components/system-chrome';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { StatusBarProvider } from '@/contexts/StatusBarContext';
 import { ThemeProvider, useAppTheme } from '@/contexts/ThemeContext';
+import { QueryProvider } from '@/providers/query-provider';
 
 function RootNavigation() {
   const { colors, resolvedTheme, isReady } = useAppTheme();
@@ -57,9 +58,11 @@ export default function RootLayout() {
           <ThemeProvider>
             <StatusBarProvider>
               <RootSurface>
-                <AuthProvider>
-                  <RootNavigation />
-                </AuthProvider>
+                <QueryProvider>
+                  <AuthProvider>
+                    <RootNavigation />
+                  </AuthProvider>
+                </QueryProvider>
               </RootSurface>
             </StatusBarProvider>
           </ThemeProvider>

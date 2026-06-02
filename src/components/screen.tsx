@@ -1,7 +1,16 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { ActivityIndicator, Platform, Pressable, StatusBar, StyleSheet, View, type ViewProps } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  RefreshControl,
+  StatusBar,
+  StyleSheet,
+  View,
+  type ViewProps,
+} from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,6 +32,10 @@ type ScreenProps = ViewProps & {
   immersiveHeader?: boolean;
   /** Pull the first content block up into the header curve. */
   overlap?: number;
+  /** Pull-to-refresh handler (enables RefreshControl when set). */
+  onRefresh?: () => void | Promise<unknown>;
+  /** Spinner state while pull-to-refresh is active. */
+  refreshing?: boolean;
   children: React.ReactNode;
 };
 
@@ -35,6 +48,8 @@ export function Screen({
   header,
   immersiveHeader,
   overlap = 0,
+  onRefresh,
+  refreshing = false,
   style,
   children,
   ...rest
@@ -129,7 +144,18 @@ export function Screen({
         contentContainerStyle={{ flexGrow: 1, paddingBottom: Spacing.lg }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        bottomOffset={24}>
+        bottomOffset={24}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+              progressBackgroundColor={colors.surface}
+            />
+          ) : undefined
+        }>
         {header}
         {paddedContent}
       </KeyboardAwareScrollView>

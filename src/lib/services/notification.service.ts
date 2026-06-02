@@ -1,9 +1,10 @@
-import { apiRequest } from '@/lib/api';
+import { apiRequest, type ApiFetchOptions } from '@/lib/api';
 import type { NotificationAudience, NotificationItem, NotificationListData } from '@/lib/types';
 
-export async function getMyNotifications(limit = 20) {
+export async function getMyNotifications(limit = 20, fetchOptions?: ApiFetchOptions) {
   const { data } = await apiRequest<NotificationListData>('/notifications/my', {
     params: { limit },
+    signal: fetchOptions?.signal,
   });
   return data;
 }

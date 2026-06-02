@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
@@ -11,14 +11,16 @@ import { IconBadge } from '@/components/ui/icon-badge';
 import { Input } from '@/components/ui/input';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useTheme } from '@/theme';
-import { useScreenLoad } from '@/hooks/use-screen-load';
+import {
+  useAdmissionPanelQuery,
+  useInvalidateAdmissionQueries,
+} from '@/hooks/queries/admission';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
 import {
   allocateSeat,
   createSeatCharge,
-  getApplications,
-  getAvailableRooms,
   reviewApplication,
 } from '@/lib/services/admission.service';
 import {
@@ -34,41 +36,25 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: '#DC2626',
 };
 
-type AvailableRoom = {
-  id: string;
-  roomNumber: number;
-  hall: Hall;
-  capacity: number;
-  currentOccupancy: number;
-};
-
 export default function AdmissionsScreen() {
   const { colors, spacing } = useTheme();
   const [statusFilter, setStatusFilter] = useState<SeatApplicationStatus | 'ALL'>('ALL');
-  const [applications, setApplications] = useState<SeatApplication[]>([]);
-  const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([]);
-  const [availableHalls, setAvailableHalls] = useState<Hall[]>([]);
+  const panelQuery = useAdmissionPanelQuery(statusFilter);
+  const invalidateAdmission = useInvalidateAdmissionQueries();
+  const applications = panelQuery.data?.applications ?? [];
+  const availableRooms = panelQuery.data?.availableRooms ?? [];
+  const availableHalls = panelQuery.data?.availableHalls ?? [];
+  const loading = panelQuery.isLoading && !panelQuery.data;
+
   const [chargeAmounts, setChargeAmounts] = useState<Record<string, string>>({});
   const [chargeHalls, setChargeHalls] = useState<Record<string, string>>({});
   const [roomSelections, setRoomSelections] = useState<Record<string, string>>({});
 
-  const { loading, reload } = useScreenLoad(
-    useCallback(async () => {
-      try {
-        const [appsRes, roomsRes] = await Promise.all([
-          getApplications(statusFilter === 'ALL' ? undefined : { status: statusFilter }),
-          getAvailableRooms(),
-        ]);
-        setApplications(appsRes.data.applications ?? []);
-        const rooms = (roomsRes.data?.rooms ?? []) as AvailableRoom[];
-        setAvailableRooms(rooms);
-        setAvailableHalls((roomsRes.data?.halls ?? []) as Hall[]);
-      } catch (err) {
-        Alert.alert('Error', getApiErrorMessage(err));
-      }
-    }, [statusFilter]),
-    [statusFilter],
-  );
+  const reload = async () => {
+    await invalidateAdmission();
+  };
+
+  const { onRefresh, refreshing } = usePullToRefresh(() => panelQuery.refetch());
 
   const review = async (id: string, status: 'APPROVED' | 'REJECTED') => {
     try {
@@ -125,7 +111,10 @@ export default function AdmissionsScreen() {
       title="Seat Allocation"
       subtitle="DSW — review applications & assign seats"
       withBackButton
-      loading={loading}>
+      loading={loading}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+    >
       <View style={styles.chipRow}>
         {filters.map((f) => (
           <Chip

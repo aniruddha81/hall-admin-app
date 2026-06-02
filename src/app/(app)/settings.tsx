@@ -1,5 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useTheme, type ThemePreference } from '@/theme';
 import { getApiErrorMessage } from '@/lib/api';
 import { formatLabel } from '@/lib/roles';
@@ -86,23 +87,27 @@ export default function SettingsScreen() {
     user?.designation === 'ASST_INVENTORY' ||
     user?.designation === 'INVENTORY_SECTION_OFFICER';
 
-  useEffect(() => {
+  const loadSettingsData = useCallback(async () => {
     if (!isProvost && !canManageSessions) return;
-    (async () => {
-      try {
-        if (isProvost) {
-          const res = await getAdminApplications();
-          setPendingAdmins((res.data.applications ?? []).filter((a) => !a.isActive));
-        }
-        if (canManageSessions) {
-          const res = await getManagedAcademicSessions();
-          setSessions(res.data.sessions ?? []);
-        }
-      } catch {
-        // Non-blocking
+    try {
+      if (isProvost) {
+        const res = await getAdminApplications();
+        setPendingAdmins((res.data.applications ?? []).filter((a) => !a.isActive));
       }
-    })();
+      if (canManageSessions) {
+        const res = await getManagedAcademicSessions();
+        setSessions(res.data.sessions ?? []);
+      }
+    } catch {
+      // Non-blocking
+    }
   }, [isProvost, canManageSessions]);
+
+  useEffect(() => {
+    void loadSettingsData();
+  }, [loadSettingsData]);
+
+  const { onRefresh, refreshing } = usePullToRefresh(loadSettingsData);
 
   const handleLogoutAll = async () => {
     try {
@@ -151,7 +156,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <Screen title="Settings" withBackButton>
+    <Screen title="Settings" withBackButton onRefresh={onRefresh} refreshing={refreshing}>
       <SectionHeader title="Appearance" caption="Pick how the application looks" />
       <View style={[styles.themeRow, { gap: spacing.sm }]}>
         {THEME_OPTIONS.map((opt) => (

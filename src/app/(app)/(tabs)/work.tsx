@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FeatureTile } from '@/components/ui/feature-tile';
 import { SectionHeader } from '@/components/ui/section-header';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { useTheme } from '@/theme';
 import {
   ADMISSION_ROLES,
@@ -18,7 +19,8 @@ import {
 } from '@/lib/roles';
 
 export default function WorkScreen() {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
+  const { onRefresh, refreshing } = usePullToRefresh(refreshProfile);
   const { colors, spacing } = useTheme();
 
   const modules = [
@@ -79,7 +81,7 @@ export default function WorkScreen() {
   );
 
   return (
-    <Screen header={header} overlap={24}>
+    <Screen header={header} overlap={24} onRefresh={onRefresh} refreshing={refreshing}>
       <SectionHeader title="Your Modules" caption="Role-gated back-office tools" />
       {accessible.length === 0 ? (
         <EmptyState

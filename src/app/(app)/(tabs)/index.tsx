@@ -146,7 +146,14 @@ export default function DashboardScreen() {
           {todayMenus.length > 0 ? (
             <View style={styles.list}>
               {todayMenus.slice(0, 4).map((m) => (
-                <ListRow key={m.id} icon="restaurant" accent={colors.primary} title={`${formatLabel(m.mealType)} · ${m.menuDescription}`} subtitle={`${m.availableTokens} tokens left`} trailingText={`৳${m.price}`} />
+                <ListRow
+                  key={m.id}
+                  icon="restaurant"
+                  accent={colors.primary}
+                  title={`${formatLabel(m.hall)} · ${formatLabel(m.mealType)}`}
+                  subtitle={`${m.menuDescription} · ${m.availableTokens} tokens left`}
+                  trailingText={`৳${m.price}`}
+                />
               ))}
             </View>
           ) : (

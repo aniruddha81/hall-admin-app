@@ -169,7 +169,9 @@ export default function DiningScreen() {
         <View style={styles.menuHead}>
           <IconBadge name={isDinner ? 'dinner-dining' : 'lunch-dining'} color={accent} background={tint} size={44} />
           <View style={{ flex: 1 }}>
-            <ThemedText type="subtitle" style={{ fontSize: 16 }}>{formatLabel(m.mealType)}</ThemedText>
+            <ThemedText type="subtitle" style={{ fontSize: 16 }}>
+              {formatLabel(m.hall)} · {formatLabel(m.mealType)}
+            </ThemedText>
             <ThemedText type="small" themeColor="textMuted" numberOfLines={2}>{m.menuDescription}</ThemedText>
           </View>
           <View style={[styles.priceTag, { backgroundColor: tint, borderRadius: radius.full }]}>
@@ -274,8 +276,12 @@ export default function DiningScreen() {
                   <View style={styles.menuHead}>
                     <IconBadge name="confirmation-number" color={colors.primary} background={`${colors.primary}1A`} size={40} />
                     <View style={{ flex: 1 }}>
-                      <ThemedText type="subtitle" style={{ fontSize: 15 }}>{b.mealType} · {b.mealDate}</ThemedText>
-                      <ThemedText type="small" themeColor="textMuted">Qty {b.quantity} · {b.status}</ThemedText>
+                      <ThemedText type="subtitle" style={{ fontSize: 15 }}>
+                        {formatLabel(b.hall)} · {formatLabel(b.mealType)}
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textMuted">
+                        {b.mealDate} · Qty {b.quantity} · {b.status}
+                      </ThemedText>
                     </View>
                     <ThemedText type="smallBold" style={{ color: colors.secondary }}>৳{b.totalAmount}</ThemedText>
                   </View>

@@ -43,8 +43,8 @@ export default function FinanceScreen() {
   const expenses = expensesQuery.data ?? [];
   const [ledger, setLedger] = useState<StudentLedger | null>(null);
   const [loading, setLoading] = useState(false);
-  const [studentId, setStudentId] = useState('');
-  const [dueStudentId, setDueStudentId] = useState('');
+  const [rollNumber, setRollNumber] = useState('');
+  const [dueRollNumber, setDueRollNumber] = useState('');
   const [dueAmount, setDueAmount] = useState('');
   const [dueType, setDueType] = useState<DueType>('RENT');
   const [payDueId, setPayDueId] = useState('');
@@ -62,7 +62,7 @@ export default function FinanceScreen() {
   const { onRefresh, refreshing } = usePullToRefresh(async () => {
     if (tab === 'expenses') {
       await expensesQuery.refetch();
-    } else if (tab === 'ledger' && studentId.trim()) {
+    } else if (tab === 'ledger' && rollNumber.trim()) {
       await lookupLedger();
     }
   });
@@ -75,16 +75,16 @@ export default function FinanceScreen() {
   };
 
   const submitDue = async () => {
-    if (!dueStudentId || !dueAmount || !user?.hall) return;
+    if (!dueRollNumber || !dueAmount || !user?.hall) return;
     setSaving(true);
     try {
       await createDue({
-        studentId: dueStudentId.trim(),
+        rollNumber: dueRollNumber.trim(),
         hall: user.hall,
         dueType,
         amount: Number(dueAmount),
       });
-      setDueStudentId('');
+      setDueRollNumber('');
       setDueAmount('');
       Alert.alert('Created', 'Due created successfully.');
     } catch (err) {
@@ -131,10 +131,10 @@ export default function FinanceScreen() {
   };
 
   const lookupLedger = async () => {
-    if (!studentId.trim()) return;
+    if (!rollNumber.trim()) return;
     setLoading(true);
     try {
-      const res = await getStudentLedger(studentId.trim());
+      const res = await getStudentLedger(rollNumber.trim());
       setLedger(res.data);
     } catch (err) {
       Alert.alert('Error', getApiErrorMessage(err));
@@ -196,7 +196,7 @@ export default function FinanceScreen() {
           <SectionHeader title="Create Due" caption="Assign a new charge to a student" />
           <Card variant="tinted" style={{ paddingVertical: 16 }}>
             <View style={{ gap: spacing.sm }}>
-              <Input label="Student ID" icon="person" value={dueStudentId} onChangeText={setDueStudentId} />
+              <Input label="Roll number" icon="person" placeholder="e.g. 240001" value={dueRollNumber} onChangeText={setDueRollNumber} />
               <ThemedText type="overline">Due type</ThemedText>
               <View style={styles.chipRow}>
                 {DUE_TYPES.map((t) => (
@@ -266,10 +266,10 @@ export default function FinanceScreen() {
       {tab === 'ledger' ? (
         <View style={{ gap: spacing.md }}>
           <SectionHeader title="Student Lookup" caption="Search dues and payment history" />
-          <Input label="Student ID" icon="person" value={studentId} onChangeText={setStudentId} />
+          <Input label="Roll number" icon="person" placeholder="e.g. 240001" value={rollNumber} onChangeText={setRollNumber} />
           <Button title="Lookup ledger" onPress={lookupLedger} />
           {!ledger ? (
-            <EmptyState icon="search" title="No Ledger Loaded" message="Enter a student ID and tap lookup to view their financial record." />
+            <EmptyState icon="search" title="No Ledger Loaded" message="Enter a roll number and tap lookup to view their financial record." />
           ) : (
             <>
               <Card variant="tinted">

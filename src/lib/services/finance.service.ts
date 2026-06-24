@@ -66,7 +66,7 @@ function mapPayment(raw: RawPayment): Payment {
 }
 
 export async function createDue(body: {
-  studentId: string;
+  rollNumber: string;
   hall: Hall;
   dueType: DueType;
   amount: number;
@@ -74,7 +74,7 @@ export async function createDue(body: {
   const { data } = await apiRequest<RawStudentDue>('/finance/dues', {
     method: 'POST',
     body: {
-      studentId: body.studentId,
+      rollNumber: body.rollNumber.trim(),
       hall: body.hall,
       type: body.dueType,
       amount: body.amount,
@@ -129,14 +129,14 @@ export async function getExpenses(
   return data;
 }
 
-export async function getStudentLedger(studentId: string) {
+export async function getStudentLedger(rollNumber: string) {
   const { data } = await apiRequest<{
     student?: StudentLedger['student'];
     dues: RawStudentDue[];
     payments: RawPayment[];
     mealPayments: MealPayment[];
     summary?: StudentLedger['summary'];
-  }>(`/finance/student/ledger/${studentId}`);
+  }>(`/finance/student/ledger/${encodeURIComponent(rollNumber.trim())}`);
 
   const payload = data.data;
   return {
